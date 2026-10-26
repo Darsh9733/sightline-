@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+data/uploads/*
+!data/uploads/.gitkeep
+data/frames/*
+!data/frames/.gitkeep
+data/audio/*
+!data/audio/.gitkeep
+.pytest_cache/
+node_modules/
+dist/

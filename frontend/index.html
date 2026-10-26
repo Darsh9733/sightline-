@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sightline AI — Intelligent Visual Narration for Blind & Visually Impaired Users</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="theme-dark">
+  <!-- Skip navigation link for keyboard & screen reader users -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- ARIA Live Regions for Non-Visual Announcements -->
+  <div id="sr-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <div id="sr-alert" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+  <header role="banner" class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <h1 id="app-title">Sightline AI</h1>
+        <p class="tagline">Intelligent Visual Experience & Spoken Narration</p>
+      </div>
+
+      <nav aria-label="Accessibility quick controls" class="quick-controls">
+        <button id="btn-theme-toggle" class="btn-secondary" aria-pressed="false" title="Switch high-contrast theme">
+          <span aria-hidden="true">👁️</span> High Contrast
+        </button>
+        <button id="btn-audio-guide" class="btn-secondary" title="Replay spoken onboarding guide">
+          <span aria-hidden="true">🔊</span> Audio Guide
+        </button>
+        <button id="btn-shortcuts-help" class="btn-secondary" aria-expanded="false" aria-controls="shortcuts-dialog" title="View keyboard shortcuts (Press ?)">
+          <span aria-hidden="true">⌨️</span> Shortcuts (?)
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content" role="main" class="container">
+    
+    <!-- Video Selection & Setup Section -->
+    <section id="setup-section" class="card" aria-labelledby="heading-setup">
+      <h2 id="heading-setup">1. Select Video & Configure Narration</h2>
+      
+      <div class="grid-layout">
+        <!-- Upload Form -->
+        <div class="form-group">
+          <label for="video-file-input" class="label-bold">Choose or Upload Video File</label>
+          <p class="hint-text">Supported: MP4, WebM, MOV, AVI, MKV (Max 100MB, under 5 minutes)</p>
+          <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/quicktime,video/x-msvideo" aria-describedby="upload-status-msg">
+          <button id="btn-sample-video" class="btn-secondary" style="margin-top: 0.5rem;">
+            Load Built-In Sample Test Video
+          </button>
+          <div id="upload-status-msg" class="status-box" role="status" aria-live="polite">Ready for video selection.</div>
+        </div>
+
+        <!-- Narration Configuration -->
+        <div class="config-grid">
+          <div class="form-group">
+            <label for="select-narration-mode" class="label-bold">Narration Mode</label>
+            <select id="select-narration-mode">
+              <option value="general" selected>General Video (Balanced natural narration)</option>
+              <option value="movie">Movie & Storytelling (Characters & scene pacing)</option>
+              <option value="realtime">Real-Time / Low Latency (Urgent, concise changes)</option>
+              <option value="educational">Educational & Demo (Steps, diagrams & screens)</option>
+              <option value="sports">Sports & Fast-Action (Positions & physical play)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="select-detail-level" class="label-bold">Detail Level</label>
+            <select id="select-detail-level">
+              <option value="minimal">Minimal (Key transitions & major events only)</option>
+              <option value="balanced" selected>Balanced (Actions, spatial layout & context)</option>
+              <option value="detailed">Detailed (Comprehensive posture, movement & background)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="select-voice" class="label-bold">Narration Voice (Sarvam Bulbul)</label>
+            <select id="select-voice">
+              <option value="shubh" selected>Shubh (Natural, clear male voice)</option>
+              <option value="priya">Priya (Warm, natural female voice)</option>
+              <option value="aditya">Aditya (Expressive male voice)</option>
+              <option value="ritu">Ritu (Clear female narration)</option>
+              <option value="rohan">Rohan (Calm male voice)</option>
+              <option value="simran">Simran (Engaging female voice)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="slider-pace" class="label-bold">
+              Speech Speed: <span id="pace-display">1.0x</span>
+            </label>
+            <input type="range" id="slider-pace" min="0.75" max="1.75" step="0.25" value="1.0" aria-valuemin="0.75" aria-valuemax="1.75" aria-valuenow="1.0">
+          </div>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <button id="btn-start-analysis" class="btn-primary" disabled>
+          Start AI Video Analysis
+        </button>
+        <button id="btn-delete-job" class="btn-danger" style="display: none;" title="Permanently delete video and generated data">
+          Delete Video & Data
+        </button>
+      </div>
+
+      <!-- Processing Progress Box -->
+      <div id="progress-container" class="progress-container" style="display: none;" role="region" aria-labelledby="progress-label">
+        <div id="progress-label" class="progress-label">Processing Video...</div>
+        <div class="progress-bar-bg" role="progressbar" id="progress-bar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+          <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+        </div>
+        <div id="progress-text" class="progress-text" aria-live="polite">Initializing...</div>
+      </div>
+    </section>
+
+    <!-- Experience & Playback Section -->
+    <section id="playback-section" class="card" aria-labelledby="heading-playback" style="display: none;">
+      <h2 id="heading-playback">2. Spoken Video Experience</h2>
+
+      <div class="player-wrapper">
+        <!-- Video Preview (Accessible with controls, ducking enabled) -->
+        <div class="video-container">
+          <video id="main-video" controls playsinline preload="metadata">
+            Your browser does not support HTML5 video playback.
+          </video>
+          <!-- Audio Element for Narrations -->
+          <audio id="narration-audio" preload="auto"></audio>
+        </div>
+
+        <!-- Accessible Keyboard-First Playback Controls -->
+        <div class="playback-controls" role="group" aria-label="Narration and video playback controls">
+          <button id="btn-play-pause" class="btn-ctrl" title="Play or Pause video and narration (Space or K)">
+            <span id="play-pause-icon" aria-hidden="true">▶️</span>
+            <span id="play-pause-text">Play (Space)</span>
+          </button>
+          <button id="btn-seek-back" class="btn-ctrl" title="Jump backward 5 seconds (J or Left Arrow)">
+            ⏪ -5s (J)
+          </button>
+          <button id="btn-seek-fwd" class="btn-ctrl" title="Jump forward 5 seconds (L or Right Arrow)">
+            ⏩ +5s (L)
+          </button>
+          <button id="btn-repeat-last" class="btn-ctrl" title="Repeat last spoken description (R)">
+            🔁 Repeat (R)
+          </button>
+          <button id="btn-more-detail" class="btn-ctrl" title="Describe current scene in more detail (D)">
+            🔍 More Detail (D)
+          </button>
+          <button id="btn-ask-question" class="btn-ctrl" title="Ask a question about this moment (Q)">
+            ❓ Ask Question (Q)
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Current Description Box -->
+      <div class="active-narration-box" role="region" aria-labelledby="active-narration-heading">
+        <h3 id="active-narration-heading">Current Spoken Description:</h3>
+        <p id="active-narration-text" class="narration-highlight" aria-live="polite">
+          Ready to play. Narration will speak automatically as the video progresses.
+        </p>
+      </div>
+
+      <!-- Interactive Q&A Panel -->
+      <div id="qa-panel" class="qa-container" role="region" aria-labelledby="qa-heading">
+        <h3 id="qa-heading">Ask Sightline AI About This Scene</h3>
+        <p class="hint-text">Ask questions like: "What is the person holding?", "Who entered the room?", or "Describe the background."</p>
+        
+        <form id="qa-form" class="qa-form">
+          <div class="qa-input-row">
+            <input type="text" id="qa-input" placeholder="Type or speak your question..." aria-label="Question about the current scene">
+            <button type="button" id="btn-voice-input" class="btn-secondary" title="Speak question using microphone">
+              🎤 Voice
+            </button>
+            <button type="submit" id="btn-submit-qa" class="btn-primary">
+              Ask (Enter)
+            </button>
+          </div>
+        </form>
+
+        <div id="qa-result-box" class="qa-result-box" style="display: none;" aria-live="polite">
+          <strong>Answer:</strong>
+          <p id="qa-answer-text"></p>
+        </div>
+      </div>
+
+      <!-- Synchronized Transcript -->
+      <div class="transcript-section" role="region" aria-labelledby="transcript-heading">
+        <h3 id="transcript-heading">Synchronized Spoken Transcript</h3>
+        <p class="hint-text">Select any description to jump the video directly to that timestamp.</p>
+        <ul id="transcript-list" class="transcript-list" role="list">
+          <!-- Dynamically populated -->
+        </ul>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Keyboard Shortcuts Dialog (Accessible Modal) -->
+  <dialog id="shortcuts-dialog" aria-labelledby="shortcuts-dialog-title">
+    <div class="modal-content">
+      <h2 id="shortcuts-dialog-title">Keyboard Shortcuts Guide</h2>
+      <ul class="shortcuts-list">
+        <li><kbd>Space</kbd> or <kbd>k</kbd>: Play / Pause video & narration</li>
+        <li><kbd>r</kbd>: Repeat last spoken description</li>
+        <li><kbd>d</kbd>: Request more detail on current scene</li>
+        <li><kbd>q</kbd>: Focus question input</li>
+        <li><kbd>j</kbd> or <kbd>←</kbd>: Jump backward 5 seconds</li>
+        <li><kbd>l</kbd> or <kbd>→</kbd>: Jump forward 5 seconds</li>
+        <li><kbd>[</kbd> / <kbd>]</kbd>: Decrease / increase speech speed</li>
+        <li><kbd>m</kbd>: Mute / unmute original video</li>
+        <li><kbd>?</kbd>: Open this shortcuts guide</li>
+        <li><kbd>Escape</kbd>: Close modal / cancel speech</li>
+      </ul>
+      <button id="btn-close-shortcuts" class="btn-primary" style="margin-top: 1rem;">Close (Escape)</button>
+    </div>
+  </dialog>
+
+  <footer role="contentinfo" class="app-footer">
+    <p>Sightline AI — Assistive Visual Experience Engine for Blind and Visually Impaired Individuals.</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
