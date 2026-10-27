@@ -40,6 +40,11 @@ const qaAnswerText = document.getElementById("qa-answer-text");
 const sliderPace = document.getElementById("slider-pace");
 const paceDisplay = document.getElementById("pace-display");
 const btnThemeToggle = document.getElementById("btn-theme-toggle");
+const btnHowToUse = document.getElementById("btn-how-to-use");
+const howToUseDialog = document.getElementById("how-to-use-dialog");
+const btnCloseHowToUse = document.getElementById("btn-close-how-to-use");
+const btnReadGuideAloud = document.getElementById("btn-read-guide-aloud");
+const chkDontShowGuide = document.getElementById("chk-dont-show-guide");
 const btnAudioGuide = document.getElementById("btn-audio-guide");
 const btnShortcutsHelp = document.getElementById("btn-shortcuts-help");
 const shortcutsDialog = document.getElementById("shortcuts-dialog");
@@ -90,10 +95,55 @@ function playOnboardingGuide() {
   speakText(guide);
 }
 
-// On initial load, offer spoken audio guide
+// On initial load, offer spoken audio guide and trigger First-Time User Guide
 window.addEventListener("DOMContentLoaded", () => {
-  announceSR("Sightline AI loaded. Press Space or Tab to explore controls, or click Audio Guide for orientation.");
+  announceSR("Sightline AI loaded. Press Space or Tab to explore controls, or click How to Use for a quick guide.");
+
+  // First-time visitor check: auto-open How to Use guide
+  const hasSeenGuide = localStorage.getItem("sightline_has_seen_guide");
+  if (!hasSeenGuide && howToUseDialog) {
+    setTimeout(() => {
+      howToUseDialog.showModal();
+      if (btnCloseHowToUse) btnCloseHowToUse.focus();
+      announceSR("Welcome to Sightline AI. Quick start guide is open. Press Enter or Escape to dismiss, or click Read Guide Aloud.");
+    }, 450);
+  }
 });
+
+function closeHowToUseGuide() {
+  if (chkDontShowGuide && chkDontShowGuide.checked) {
+    localStorage.setItem("sightline_has_seen_guide", "true");
+  }
+  if (howToUseDialog && howToUseDialog.open) {
+    howToUseDialog.close();
+  }
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  btnSample.focus();
+}
+
+if (btnHowToUse && howToUseDialog) {
+  btnHowToUse.addEventListener("click", () => {
+    howToUseDialog.showModal();
+    if (btnCloseHowToUse) btnCloseHowToUse.focus();
+  });
+}
+
+if (btnCloseHowToUse) {
+  btnCloseHowToUse.addEventListener("click", closeHowToUseGuide);
+}
+
+if (btnReadGuideAloud) {
+  btnReadGuideAloud.addEventListener("click", () => {
+    const guideText = "Welcome to Sightline AI, an assistive visual experience platform. " +
+      "Step 1: Choose or upload a video file, or click Load Built-in Sample Test Video. " +
+      "Step 2: Configure your preferred narration mode and speaking pace. " +
+      "Step 3: Click Start AI Video Analysis. When ready, press Space to play. Spoken descriptions will play automatically at each scene change, lowering background audio. " +
+      "Step 4: Press Q anytime to ask questions about visible details, people, or actions. " +
+      "Key shortcuts: Space for Play or Pause, R to repeat last narration, D for deeper scene detail, and question mark for all shortcuts.";
+    announceSR(guideText, true);
+    speakText(guideText);
+  });
+}
 
 btnAudioGuide.addEventListener("click", playOnboardingGuide);
 
@@ -623,12 +673,21 @@ document.addEventListener("keydown", (e) => {
       mainVideo.muted = !mainVideo.muted;
       announceSR(mainVideo.muted ? "Video audio muted." : "Video audio unmuted.");
       break;
+    case "h":
+      e.preventDefault();
+      if (howToUseDialog) {
+        howToUseDialog.showModal();
+        if (btnCloseHowToUse) btnCloseHowToUse.focus();
+      }
+      break;
     case "?":
       e.preventDefault();
       shortcutsDialog.showModal();
       break;
     case "escape":
-      if (shortcutsDialog.open) {
+      if (howToUseDialog && howToUseDialog.open) {
+        closeHowToUseGuide();
+      } else if (shortcutsDialog.open) {
         shortcutsDialog.close();
       } else {
         if ("speechSynthesis" in window) window.speechSynthesis.cancel();

@@ -22,6 +22,9 @@
       </div>
 
       <nav aria-label="Accessibility quick controls" class="quick-controls">
+        <button id="btn-how-to-use" class="btn-secondary" aria-expanded="false" aria-controls="how-to-use-dialog" title="View step-by-step user guide (Press H)">
+          <span aria-hidden="true">📖</span> How to Use
+        </button>
         <button id="btn-theme-toggle" class="btn-secondary" aria-pressed="false" title="Switch high-contrast theme">
           <span aria-hidden="true">👁️</span> High Contrast
         </button>
@@ -201,6 +204,70 @@
 
   </main>
 
+  <!-- How to Use Dialog (First-time Onboarding & Help Guide) -->
+  <dialog id="how-to-use-dialog" aria-labelledby="how-to-use-title">
+    <div class="modal-content how-to-use-content">
+      <div class="how-to-use-header">
+        <div>
+          <h2 id="how-to-use-title">📖 Welcome to Sightline AI</h2>
+          <p class="tagline">Intelligent Spoken Video Experience for Blind & Visually Impaired Users</p>
+        </div>
+        <button id="btn-read-guide-aloud" class="btn-secondary btn-sm" title="Listen to this guide spoken aloud">
+          <span aria-hidden="true">🔊</span> Read Guide Aloud
+        </button>
+      </div>
+
+      <div class="stepper-grid">
+        <div class="step-card">
+          <div class="step-badge" aria-hidden="true">1</div>
+          <div class="step-details">
+            <h3>Choose or Upload a Video</h3>
+            <p>Select your own video file (MP4, WebM, MOV) or click <strong>"Load Built-In Sample Test Video"</strong> for an instant hands-on demonstration.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-badge" aria-hidden="true">2</div>
+          <div class="step-details">
+            <h3>Configure Narration Style</h3>
+            <p>Select your preferred mode (General, Movie & Storytelling, Educational, Sports) and speech pace to tailor descriptions to your listening preference.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-badge" aria-hidden="true">3</div>
+          <div class="step-details">
+            <h3>Start AI Analysis & Play</h3>
+            <p>Click <strong>"Start AI Video Analysis"</strong>. Once ready, press <strong>Space</strong> or click <strong>Play</strong>. The AI automatically speaks descriptions aloud at each scene transition while lowering the video's background sound.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-badge" aria-hidden="true">4</div>
+          <div class="step-details">
+            <h3>Interactive Q&A Anytime</h3>
+            <p>Curious about a visual detail? Press <strong>Q</strong> to type or click <strong>🎤 Voice</strong> to ask questions like <em>"What is the person holding?"</em> or <em>"Describe the room layout"</em>.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-tips-box">
+        <h4>⚡ Handy Keyboard Controls</h4>
+        <p><kbd>Space</kbd> Play/Pause &bull; <kbd>R</kbd> Repeat Spoken Description &bull; <kbd>D</kbd> More Scene Detail &bull; <kbd>Q</kbd> Ask Question &bull; <kbd>?</kbd> All Shortcuts</p>
+      </div>
+
+      <div class="how-to-use-footer">
+        <label class="checkbox-container">
+          <input type="checkbox" id="chk-dont-show-guide">
+          <span>Don't show this guide automatically on next visit</span>
+        </label>
+        <button id="btn-close-how-to-use" class="btn-primary">
+          🚀 Get Started (Enter)
+        </button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- Keyboard Shortcuts Dialog (Accessible Modal) -->
   <dialog id="shortcuts-dialog" aria-labelledby="shortcuts-dialog-title">
     <div class="modal-content">
@@ -214,6 +281,7 @@
         <li><kbd>l</kbd> or <kbd>→</kbd>: Jump forward 5 seconds</li>
         <li><kbd>[</kbd> / <kbd>]</kbd>: Decrease / increase speech speed</li>
         <li><kbd>m</kbd>: Mute / unmute original video</li>
+        <li><kbd>h</kbd>: Open How to Use guide</li>
         <li><kbd>?</kbd>: Open this shortcuts guide</li>
         <li><kbd>Escape</kbd>: Close modal / cancel speech</li>
       </ul>
