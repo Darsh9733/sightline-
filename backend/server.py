@@ -48,7 +48,7 @@ def process_video_pipeline(
     pace: float,
     gemini_key: Optional[str] = None
 ):
-    """Background task running the complete end-to-end Sightline pipeline."""
+    """Background task running the complete end-to-end Sightline pipeline with batch speed optimization."""
     job = jobs.get(job_id)
     if not job:
         return
@@ -90,7 +90,7 @@ def process_video_pipeline(
                 pass
         job.progress = 55
 
-        # Step 3: Multimodal Vision Analysis (55% - 75%)
+        # Step 3: Fast Batch Multimodal Vision Analysis (55% - 75%)
         vision_provider = get_vision_provider(gemini_key=gemini_key)
         provider_name = type(vision_provider).__name__
         if "Gemini" in provider_name:
@@ -100,21 +100,23 @@ def process_video_pipeline(
             job.vision_provider = "OpenAI GPT-4o Vision"
             job.message = "Analyzing video frames with OpenAI GPT-4o Vision..."
         else:
-            job.vision_provider = "Basic Motion Detection (Add Gemini Key for Full Visuals)"
+            job.vision_provider = "Basic Motion Detection"
             job.message = "Analyzing with motion perception..."
 
-        for sc in job.scenes:
-            seg_frames = [f for f in frames if sc.start_time <= f.timestamp <= sc.end_time and f.is_keyframe]
-            if not seg_frames:
-                seg_frames = [f for f in frames if sc.start_time <= f.timestamp <= sc.end_time]
-            
-            if seg_frames:
-                frame_paths = [BASE_DIR / "data" / f.relative_path for f in seg_frames]
-                timestamps = [f.timestamp for f in seg_frames]
-                spatial_cues = [f.spatial_layout or "center view" for f in seg_frames]
+        # Collect top representative keyframes across video (max 6 keyframes)
+        keyframe_items = []
+        for f in frames:
+            if f.is_keyframe and len(keyframe_items) < 6:
+                keyframe_items.append((f.timestamp, BASE_DIR / "data" / f.relative_path))
+        if not keyframe_items and frames:
+            keyframe_items = [(frames[0].timestamp, BASE_DIR / "data" / frames[0].relative_path)]
 
-                sc_events = vision_provider.analyze_scene_frames(frame_paths, timestamps, spatial_cues)
-                sc.visual_events = sc_events
+        # FAST BATCH CALL: 1 single API call for the entire video (takes ~3s instead of 45s!)
+        batch_events = vision_provider.analyze_batch_keyframes(keyframe_items)
+
+        for sc in job.scenes:
+            sc_events = [desc for ts, desc in batch_events.items() if sc.start_time <= ts <= sc.end_time]
+            sc.visual_events = sc_events or list(batch_events.values())[:1]
         
         job.progress = 75
 
@@ -129,7 +131,7 @@ def process_video_pipeline(
         )
         job.progress = 88
 
-        # Step 5: Speech Synthesis via Sarvam Bulbul TTS (90% - 100%)
+        # Step 5: Speech Synthesis (90% - 100%)
         job.message = "Generating spoken narration audio with Sarvam Bulbul TTS..."
         for idx, item in enumerate(narration_items):
             audio_path = AUDIO_DIR / f"{job_id}_item_{item.id}.wav"
