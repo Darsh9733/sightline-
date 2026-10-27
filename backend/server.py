@@ -40,7 +40,14 @@ tts_engine = TTSEngine()
 qa_engine = QAEngine()
 
 
-def process_video_pipeline(job_id: str, mode: NarrationMode, detail_level: DetailLevel, voice: str, pace: float):
+def process_video_pipeline(
+    job_id: str,
+    mode: NarrationMode,
+    detail_level: DetailLevel,
+    voice: str,
+    pace: float,
+    gemini_key: Optional[str] = None
+):
     """Background task running the complete end-to-end Sightline pipeline."""
     job = jobs.get(job_id)
     if not job:
@@ -68,7 +75,6 @@ def process_video_pipeline(job_id: str, mode: NarrationMode, detail_level: Detai
         job.message = "Checking audio track for dialogue preservation..."
         audio_file = video_engine.extract_audio(video_path, job_id)
         dialogues = []
-        # If audio extracted and Sarvam STT available, transcribe
         if audio_file:
             try:
                 from sarvamai import SarvamAI
@@ -85,9 +91,18 @@ def process_video_pipeline(job_id: str, mode: NarrationMode, detail_level: Detai
         job.progress = 55
 
         # Step 3: Multimodal Vision Analysis (55% - 75%)
-        job.message = "Applying multimodal vision to keyframes..."
-        vision_provider = get_vision_provider()
-        
+        vision_provider = get_vision_provider(gemini_key=gemini_key)
+        provider_name = type(vision_provider).__name__
+        if "Gemini" in provider_name:
+            job.vision_provider = "Google Gemini Multimodal Vision"
+            job.message = "Analyzing video frames with Google Gemini Vision..."
+        elif "OpenAI" in provider_name:
+            job.vision_provider = "OpenAI GPT-4o Vision"
+            job.message = "Analyzing video frames with OpenAI GPT-4o Vision..."
+        else:
+            job.vision_provider = "Basic Motion Detection (Add Gemini Key for Full Visuals)"
+            job.message = "Analyzing with motion perception..."
+
         for sc in job.scenes:
             seg_frames = [f for f in frames if sc.start_time <= f.timestamp <= sc.end_time and f.is_keyframe]
             if not seg_frames:
@@ -230,7 +245,8 @@ async def start_processing(
     mode: NarrationMode = Form(NarrationMode.GENERAL),
     detail_level: DetailLevel = Form(DetailLevel.BALANCED),
     voice: str = Form("shubh"),
-    pace: float = Form(1.0)
+    pace: float = Form(1.0),
+    gemini_key: Optional[str] = Form(None)
 ):
     """Initiates asynchronous video understanding and narration."""
     job = jobs.get(job_id)
@@ -245,7 +261,7 @@ async def start_processing(
     job.progress = 5
     job.message = "Starting video analysis pipeline..."
 
-    background_tasks.add_task(process_video_pipeline, job_id, mode, detail_level, voice, pace)
+    background_tasks.add_task(process_video_pipeline, job_id, mode, detail_level, voice, pace, gemini_key)
     return {"job_id": job_id, "status": "processing_started"}
 
 

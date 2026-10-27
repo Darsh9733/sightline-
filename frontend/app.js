@@ -43,6 +43,12 @@ const btnAudioGuide = document.getElementById("btn-audio-guide");
 const btnShortcutsHelp = document.getElementById("btn-shortcuts-help");
 const shortcutsDialog = document.getElementById("shortcuts-dialog");
 const btnCloseShortcuts = document.getElementById("btn-close-shortcuts");
+const inputGeminiKey = document.getElementById("input-gemini-key");
+
+// Restore saved Gemini API key if present
+if (localStorage.getItem("sightline_gemini_key") && inputGeminiKey) {
+  inputGeminiKey.value = localStorage.getItem("sightline_gemini_key");
+}
 
 // Announce to Screen Readers
 function announceSR(text, isAlert = false) {
@@ -183,6 +189,12 @@ btnStartAnalysis.addEventListener("click", async () => {
   formData.append("voice", voice);
   formData.append("pace", pace);
 
+  if (inputGeminiKey && inputGeminiKey.value.trim()) {
+    const gKey = inputGeminiKey.value.trim();
+    formData.append("gemini_key", gKey);
+    localStorage.setItem("sightline_gemini_key", gKey);
+  }
+
   try {
     const res = await fetch(`/api/process/${currentJobId}`, { method: "POST", body: formData });
     if (!res.ok) throw new Error("Could not start processing.");
@@ -227,6 +239,11 @@ function initPlayback(data) {
   progressContainer.style.display = "none";
   playbackSection.style.display = "block";
   btnDeleteJob.style.display = "inline-flex";
+
+  const headingElem = document.getElementById("active-narration-heading");
+  if (headingElem && data.vision_provider) {
+    headingElem.textContent = `Current Spoken Description (${data.vision_provider}):`;
+  }
 
   mainVideo.src = `/api/video/${data.job_id}`;
   narrations = data.narrations || [];

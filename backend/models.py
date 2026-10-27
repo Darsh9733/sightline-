@@ -75,6 +75,7 @@ class JobStatus(BaseModel):
     detail_level: DetailLevel = DetailLevel.BALANCED
     voice: str = "shubh"
     pace: float = 1.0
+    vision_provider: str = ""
     narrations: List[NarrationItem] = Field(default_factory=list)
     scenes: List[SceneSegment] = Field(default_factory=list)
 
