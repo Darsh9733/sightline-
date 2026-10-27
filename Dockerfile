@@ -21,7 +21,7 @@ COPY . .
 RUN mkdir -p data/uploads data/frames data/audio data/sample_videos
 
 # Pre-generate sample video
-RUN python backend/create_sample_video.py
+RUN python -m backend.create_sample_video
 
 EXPOSE 8000
 
