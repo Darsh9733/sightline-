@@ -1,12 +1,14 @@
+import os
 from typing import List, Optional, Dict, Any
 from backend.models import SceneSegment, NarrationItem, QAResponse
-from backend.config import SARVAM_API_KEY
+from backend.config import SARVAM_API_KEY, GEMINI_API_KEY
 from backend.tts_engine import TTSEngine
 
 
 class QAEngine:
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, gemini_key: Optional[str] = None):
         self.api_key = api_key or SARVAM_API_KEY
+        self.gemini_key = gemini_key or GEMINI_API_KEY
         self.tts = TTSEngine(api_key=self.api_key)
 
     def answer_question(
@@ -62,7 +64,28 @@ class QAEngine:
         )
 
         answer_text = ""
-        if self.api_key:
+        # Priority 1: Google Gemini Flash
+        effective_gemini_key = self.gemini_key or os.environ.get("GEMINI_API_KEY", "")
+        if effective_gemini_key:
+            try:
+                from google import genai
+                gemini_client = genai.Client(api_key=effective_gemini_key)
+                for model_cand in ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-flash-latest"]:
+                    try:
+                        resp = gemini_client.models.generate_content(
+                            model=model_cand,
+                            contents=prompt
+                        )
+                        if resp.text:
+                            answer_text = resp.text.strip()
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+        # Priority 2: Sarvam AI text model
+        if not answer_text and self.api_key:
             try:
                 from sarvamai import SarvamAI
                 client = SarvamAI(api_subscription_key=self.api_key)
@@ -73,8 +96,10 @@ class QAEngine:
                 )
                 answer_text = resp.choices[0].message.content.strip()
             except Exception:
-                answer_text = self._fallback_answer(question, relevant_scenes, target_time)
-        else:
+                pass
+
+        # Priority 3: Factual evidence fallback
+        if not answer_text:
             answer_text = self._fallback_answer(question, relevant_scenes, target_time)
 
         # Synthesize spoken audio for the answer

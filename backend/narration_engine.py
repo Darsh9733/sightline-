@@ -1,12 +1,13 @@
 import os
 from typing import List, Dict, Any, Optional
 from backend.models import SceneSegment, NarrationItem, NarrationMode, DetailLevel, DialogueItem
-from backend.config import SARVAM_API_KEY
+from backend.config import SARVAM_API_KEY, GEMINI_API_KEY
 
 
 class NarrationEngine:
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, gemini_key: Optional[str] = None):
         self.api_key = api_key or SARVAM_API_KEY
+        self.gemini_key = gemini_key or GEMINI_API_KEY
         self.history: List[str] = []
 
     def clear_history(self):
@@ -70,7 +71,31 @@ class NarrationEngine:
             )
 
             spoken_text = ""
-            if self.api_key:
+            # Priority 1: Google Gemini Multimodal / Text Generation
+            effective_gemini_key = self.gemini_key or os.environ.get("GEMINI_API_KEY", "")
+            if effective_gemini_key:
+                try:
+                    from google import genai
+                    gemini_client = genai.Client(api_key=effective_gemini_key)
+                    for model_cand in ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-flash-latest"]:
+                        try:
+                            resp = gemini_client.models.generate_content(
+                                model=model_cand,
+                                contents=prompt
+                            )
+                            if resp.text:
+                                candidate = resp.text.strip().strip('"')
+                                if candidate.lower().startswith("narration:"):
+                                    candidate = candidate[10:].strip()
+                                spoken_text = candidate
+                                break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+
+            # Priority 2: Sarvam AI Text Model
+            if not spoken_text and self.api_key:
                 try:
                     from sarvamai import SarvamAI
                     client = SarvamAI(api_subscription_key=self.api_key)
@@ -84,10 +109,11 @@ class NarrationEngine:
                     if candidate.lower().startswith("narration:"):
                         candidate = candidate[10:].strip()
                     spoken_text = candidate
-                except Exception as e:
-                    # Fallback to structured factual text
-                    spoken_text = self._fallback_narration(scene, detail_level)
-            else:
+                except Exception:
+                    pass
+
+            # Priority 3: Fallback to structured factual text
+            if not spoken_text:
                 spoken_text = self._fallback_narration(scene, detail_level)
 
             if spoken_text and spoken_text not in self.history:

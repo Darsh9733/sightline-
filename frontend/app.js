@@ -27,6 +27,7 @@ const playPauseIcon = document.getElementById("play-pause-icon");
 const btnSeekBack = document.getElementById("btn-seek-back");
 const btnSeekFwd = document.getElementById("btn-seek-fwd");
 const btnRepeatLast = document.getElementById("btn-repeat-last");
+const btnSpeakActive = document.getElementById("btn-speak-active");
 const btnMoreDetail = document.getElementById("btn-more-detail");
 const btnAskQuestion = document.getElementById("btn-ask-question");
 const activeNarrationText = document.getElementById("active-narration-text");
@@ -55,13 +56,27 @@ function announceSR(text, isAlert = false) {
   }
 }
 
-// Speak via Browser Web Speech API (Fallback / Orientation)
+// Speak via Browser Web Speech API (Fallback / Instant Speech)
+let globalUtterance = null;
 function speakText(text) {
-  if ("speechSynthesis" in window) {
+  if (!("speechSynthesis" in window) || !text) return;
+  try {
     window.speechSynthesis.cancel();
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = parseFloat(sliderPace.value);
+    utterance.rate = parseFloat(sliderPace.value) || 1.0;
+    globalUtterance = utterance; // Prevent garbage collection bug in Chromium
+    utterance.onend = () => {
+      restoreAudioDucking();
+    };
+    utterance.onerror = () => {
+      restoreAudioDucking();
+    };
     window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.warn("Speech synthesis error:", err);
   }
 }
 
@@ -232,17 +247,47 @@ function initPlayback(data) {
   narrations = data.narrations || [];
 
   // Populate Transcript
+  renderTranscript();
+
+  // Instantly show the first scene description on screen
+  if (narrations.length > 0) {
+    activeNarrationIndex = 0;
+    activeNarrationText.textContent = narrations[0].text;
+    highlightTranscriptItem(0);
+    announceSR(`Analysis complete. Initial scene: ${narrations[0].text}. Press Space to start playback.`);
+  } else {
+    activeNarrationIndex = -1;
+    activeNarrationText.textContent = "Analysis complete. Ready to play.";
+  }
+
+  btnPlayPause.focus();
+}
+
+function renderTranscript() {
   transcriptList.innerHTML = "";
   narrations.forEach((item, index) => {
     const li = document.createElement("li");
     li.className = "transcript-item";
+    li.id = `transcript-item-${index}`;
     li.tabIndex = 0;
-    li.role = "button";
-    li.setAttribute("aria-label", `Timestamp ${item.timestamp} seconds: ${item.text}`);
+    li.setAttribute("role", "button");
+    li.setAttribute("aria-label", `At ${formatTime(item.timestamp)}: ${item.text}`);
     li.innerHTML = `
-      <span class="transcript-time">${formatTime(item.timestamp)}</span>
-      <span class="transcript-text">${item.text}</span>
+      <div class="transcript-meta">
+        <span class="transcript-time">${formatTime(item.timestamp)}</span>
+        <button type="button" class="btn-listen-item" aria-label="Listen to narration at ${formatTime(item.timestamp)}">🔊 Play</button>
+      </div>
+      <div class="transcript-text">${item.text}</div>
     `;
+
+    const listenBtn = li.querySelector(".btn-listen-item");
+    if (listenBtn) {
+      listenBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        playNarration(index);
+      });
+    }
+
     li.addEventListener("click", () => jumpToNarration(index));
     li.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -252,10 +297,18 @@ function initPlayback(data) {
     });
     transcriptList.appendChild(li);
   });
+}
 
-  activeNarrationIndex = -1;
-  activeNarrationText.textContent = "Ready. Press Space to play video and hear narration.";
-  btnPlayPause.focus();
+function highlightTranscriptItem(index) {
+  const allItems = transcriptList.querySelectorAll(".transcript-item");
+  allItems.forEach((el, i) => {
+    if (i === index) {
+      el.setAttribute("aria-current", "true");
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } else {
+      el.removeAttribute("aria-current");
+    }
+  });
 }
 
 function formatTime(sec) {
@@ -272,9 +325,15 @@ function togglePlayPause() {
     playPauseIcon.textContent = "⏸️";
     playPauseText.textContent = "Pause (Space)";
     announceSR("Playing video and narration.");
+
+    // If starting at the beginning or first segment not played yet, speak it immediately!
+    if (activeNarrationIndex <= 0 && narrations.length > 0) {
+      playNarration(0);
+    }
   } else {
     mainVideo.pause();
     narrationAudio.pause();
+    if ("speechSynthesis" in window) window.speechSynthesis.pause();
     playPauseIcon.textContent = "▶️";
     playPauseText.textContent = "Play (Space)";
     announceSR("Paused.");
@@ -282,6 +341,22 @@ function togglePlayPause() {
 }
 
 btnPlayPause.addEventListener("click", togglePlayPause);
+
+// Synchronize button text if user interacts with native video controls
+mainVideo.addEventListener("play", () => {
+  playPauseIcon.textContent = "⏸️";
+  playPauseText.textContent = "Pause (Space)";
+  if (activeNarrationIndex <= 0 && narrations.length > 0) {
+    playNarration(0);
+  }
+});
+
+mainVideo.addEventListener("pause", () => {
+  narrationAudio.pause();
+  if ("speechSynthesis" in window) window.speechSynthesis.pause();
+  playPauseIcon.textContent = "▶️";
+  playPauseText.textContent = "Play (Space)";
+});
 
 // Seeking
 btnSeekBack.addEventListener("click", () => {
@@ -303,17 +378,23 @@ function jumpToNarration(index) {
   if (mainVideo.paused) mainVideo.play();
 }
 
-// Video Timeupdate & Narration Triggering
+// Robust Monotonic Narration Triggering during playback
 mainVideo.addEventListener("timeupdate", () => {
   const curTime = mainVideo.currentTime;
+  if (!narrations || narrations.length === 0) return;
 
-  // Find next narration item scheduled near current time
-  for (let i = 0; i < narrations.length; i++) {
-    const item = narrations[i];
-    if (Math.abs(curTime - item.timestamp) < 0.6 && activeNarrationIndex !== i) {
-      playNarration(i);
+  // Find latest narration segment whose timestamp <= current video time
+  let targetIndex = -1;
+  for (let i = narrations.length - 1; i >= 0; i--) {
+    if (curTime >= narrations[i].timestamp - 0.25) {
+      targetIndex = i;
       break;
     }
+  }
+
+  // Trigger narration if new segment is reached
+  if (targetIndex !== -1 && targetIndex !== activeNarrationIndex) {
+    playNarration(targetIndex);
   }
 });
 
@@ -325,33 +406,23 @@ function playNarration(index) {
 
   activeNarrationText.textContent = item.text;
   announceSR(item.text);
-
-  // Update Transcript active item
-  const allItems = transcriptList.querySelectorAll(".transcript-item");
-  allItems.forEach((el, i) => {
-    if (i === index) {
-      el.setAttribute("aria-current", "true");
-      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    } else {
-      el.removeAttribute("aria-current");
-    }
-  });
+  highlightTranscriptItem(index);
 
   // Audio Ducking: Reduce video volume while narration speaks
-  mainVideo.volume = 0.15;
+  mainVideo.volume = 0.2;
   isAudioDucking = true;
 
   if (item.audio_base64) {
     narrationAudio.src = `data:audio/wav;base64,${item.audio_base64}`;
-    narrationAudio.playbackRate = parseFloat(sliderPace.value);
+    narrationAudio.playbackRate = parseFloat(sliderPace.value) || 1.0;
     narrationAudio.play().catch(() => speakText(item.text));
   } else if (item.audio_url) {
     narrationAudio.src = item.audio_url;
-    narrationAudio.playbackRate = parseFloat(sliderPace.value);
+    narrationAudio.playbackRate = parseFloat(sliderPace.value) || 1.0;
     narrationAudio.play().catch(() => speakText(item.text));
   } else {
     speakText(item.text);
-    setTimeout(restoreAudioDucking, item.duration_estimate * 1000);
+    setTimeout(restoreAudioDucking, (item.duration_estimate || 3.0) * 1000);
   }
 }
 
@@ -372,6 +443,10 @@ function repeatLastNarration() {
   } else if (narrations.length > 0) {
     playNarration(0);
   }
+}
+
+if (btnSpeakActive) {
+  btnSpeakActive.addEventListener("click", repeatLastNarration);
 }
 
 btnRepeatLast.addEventListener("click", repeatLastNarration);

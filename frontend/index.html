@@ -155,7 +155,12 @@
 
       <!-- Live Current Description Box -->
       <div class="active-narration-box" role="region" aria-labelledby="active-narration-heading">
-        <h3 id="active-narration-heading">Current Spoken Description:</h3>
+        <div class="active-narration-header">
+          <h3 id="active-narration-heading">Current Spoken Description:</h3>
+          <button type="button" id="btn-speak-active" class="btn-ctrl btn-sm" title="Speak this description out loud (R)">
+            🔊 Speak (R)
+          </button>
+        </div>
         <p id="active-narration-text" class="narration-highlight" aria-live="polite">
           Ready to play. Narration will speak automatically as the video progresses.
         </p>
