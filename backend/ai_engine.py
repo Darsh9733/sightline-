@@ -26,23 +26,27 @@ class GeminiVisionProvider(BaseVisionProvider):
                     f"Timestamp: {ts:.1f}s. "
                     "You are the visual observer for Sightline AI, describing video for a blind listener.\n"
                     "Describe directly visible facts in 1 to 2 clear, natural sentences:\n"
-                    "1. Who or what is in the scene (people, clothing, animals, objects).\n"
+                    "1. Who or what is in the scene (people, clothing, appearance, animals, objects).\n"
                     "2. The exact physical action or movement taking place.\n"
                     "3. Spatial positions (e.g. on the left, center, foreground, background).\n"
-                    "4. Any visible expressions or background changes.\n"
+                    "4. Any visible expressions, text, or background changes.\n"
                     "Strict Rule: Only state observable facts. Never invent feelings, relationships, or unseen intentions."
                 )
-                try:
-                    response = self.client.models.generate_content(
-                        model="gemini-2.0-flash",
-                        contents=[img, prompt]
-                    )
-                except Exception:
-                    response = self.client.models.generate_content(
-                        model="gemini-1.5-flash",
-                        contents=[img, prompt]
-                    )
-                descriptions.append(response.text.strip())
+
+                resp_text = None
+                for model_candidate in ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-3.8-flash"]:
+                    try:
+                        resp = self.client.models.generate_content(
+                            model=model_candidate,
+                            contents=[img, prompt]
+                        )
+                        if resp.text:
+                            resp_text = resp.text.strip()
+                            break
+                    except Exception:
+                        continue
+
+                descriptions.append(resp_text or f"Visible action at {ts:.1f}s: {cue}")
             except Exception as e:
                 descriptions.append(f"Observable action at {ts:.1f}s: {cue}")
         return descriptions
@@ -92,7 +96,7 @@ class OpenAIVisionProvider(BaseVisionProvider):
 class SarvamPerceptionProvider(BaseVisionProvider):
     """
     Couples OpenCV perceptual feature extraction with Sarvam 105B.
-    Note: Used when multimodal vision API key is not configured.
+    Used as fallback when a dedicated vision API key is not configured.
     """
     def __init__(self, api_key: str):
         from sarvamai import SarvamAI
